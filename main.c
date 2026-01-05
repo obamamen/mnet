@@ -3,6 +3,5 @@
 
 int main(void)
 {
-    mnet_test();
-    return 0;
+    return test();
 }

@@ -1,13 +1,14 @@
 set(SOURCES
-        src/mnet.c
+    mnet.c
 )
 
 set(HEADERS
-        include/mnet.h
+    mnet.h
 )
 
 add_library(mnet ${SOURCES})
-target_include_directories(mnet PUBLIC include)
+
+target_include_directories(mnet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(WIN32)
     target_link_libraries(mnet PRIVATE ws2_32)

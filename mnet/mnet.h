@@ -2,13 +2,28 @@
  @file     mnet.h
  @project  mnet
  @author   moosm
- @date     26-12-2025
+ @date     1/5/2026
 *\ ================================== */
 
+
+///
+/// INTERFACE
+///
 #ifndef MNET_MNET_H
 #define MNET_MNET_H
 
-void mnet_test(void);
+int test();
 
+#endif//MNET_MNET_H
 
-#endif //MNET_MNET_H
+///
+/// SOURCE
+///
+#ifdef MNET_SOURCE
+
+int test()
+{
+    return 0;
+}
+
+#endif

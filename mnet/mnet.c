@@ -2,12 +2,8 @@
  @file     mnet.c
  @project  mnet
  @author   moosm
- @date     26-12-2025
+ @date     1/5/2026
 *\ ================================== */
 
-#include <stdio.h>
-
-void mnet_test(void)
-{
-    printf("mnet_test()\n");
-}
+#define MNET_SOURCE
+#include "mnet.h"
