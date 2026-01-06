@@ -3,7 +3,9 @@ set(SOURCES
 )
 
 set(HEADERS
-    mnet.h
+    mnet.h,
+    mnet_os.h
+
 )
 
 add_library(mnet ${SOURCES})
