@@ -134,7 +134,8 @@ int mnet_addr_ipv4(struct sockaddr_in *addr, const char *ip, uint16_t port)
     addr->sin_family = AF_INET;
     addr->sin_port = htons(port);
 
-    if (!ip || strcmp(ip, "0.0.0.0") == 0) {
+    if (!ip || strcmp(ip, "0.0.0.0") == 0)
+    {
         addr->sin_addr.s_addr = INADDR_ANY;
         return 0;
     }
@@ -150,7 +151,8 @@ int mnet_addr_ipv6(struct sockaddr_in6 *addr, const char *ip, uint16_t port)
     addr->sin6_family = AF_INET6;
     addr->sin6_port = htons(port);
 
-    if (!ip || strcmp(ip, "::") == 0) {
+    if (!ip || strcmp(ip, "::") == 0)
+    {
         addr->sin6_addr = in6addr_any;
         return 0;
     }
