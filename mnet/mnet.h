@@ -12,7 +12,10 @@
 #ifndef MNET_MNET_H
 #define MNET_MNET_H
 
-int test();
+#include "mnet_os.h"
+
+int mnet_initialize(void);
+void mnet_cleanup(void);
 
 #endif//MNET_MNET_H
 
@@ -21,9 +24,25 @@ int test();
 ///
 #ifdef MNET_SOURCE
 
-int test()
+int mnet_initialize(void)
 {
-    return 0;
+#ifdef MNET_WINDOWS
+
+    WSADATA wsa_data;
+    return WSAStartup(MAKEWORD(2, 2), &wsa_data);
+
+#elif MNET_UNIX
+
+    return 0
+
+#endif
+}
+
+void mnet_cleanup(void)
+{
+#ifdef MNET_WINDOWS
+    WSACleanup();
+#endif
 }
 
 #endif

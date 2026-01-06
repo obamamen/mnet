@@ -3,5 +3,10 @@
 
 int main(void)
 {
-    return test();
+    if (mnet_initialize() != 0)
+    {
+        fprintf(stderr,"mnet_initialize() failed\n");
+    }
+
+    mnet_cleanup();
 }
