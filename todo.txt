@@ -1,7 +1,9 @@
-port most OS socket code into mnet.
+port most OS socket code into mnet. [x]
  with maybe a mnet_core for functions with a bunch of parameters,
  and some more API like functions with fewer things to mess up on.
 
-folders for organization. like a /core /os
+higher level API with automatic TCP handling and easier use of UDP. [ ]
 
-higher level API with automatic TCP handling and easier use of UDP.
+try to optimize the sendv/iocvec system , with windows mnet needs to convert the mnet_iovec to
+ a windows buffer type, which needs heap and costs time.
+ a typedef and util;ity functions could be better suited. [ ]

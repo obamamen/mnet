@@ -30,6 +30,28 @@ typedef enum mnet_socket_type
     mnet_sock_raw           = SOCK_RAW
 }mnet_socket_type_t;
 
+typedef struct mnet_iovec
+{
+    void*  iov_base;// buffer start.
+    size_t iov_len; // length bytes.
+}mnet_iovec_t;
+
+typedef enum mnet_poll_events
+{
+    mnet_pollin     = POLLIN,   // data to read
+    mnet_pollout    = POLLOUT,  // ready for writing
+    mnet_pollerr    = POLLERR,  // error condition
+    mnet_pollhup    = POLLHUP,  // hang up
+    mnet_pollnval   = POLLNVAL  // invalid request
+}mnet_poll_events_t;
+
+typedef struct mnet_pollfd
+{
+    mnet_socket_t   fd;
+    short           events;   // event to listen to
+    short           revents;  // output events
+}mnet_pollfd_t;
+
 typedef enum mnet_protocol
 {
     mnet_ipproto_default    = 0,

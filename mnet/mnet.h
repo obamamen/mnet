@@ -139,6 +139,7 @@ int mnet_shutdown(mnet_socket_t sock, mnet_shutdown_code_t how);
 //               DATA TRANSFER (TCP)
 // ================================================
 
+
 // ----------------------------------------------------------------
 // send data on a connected socket. (TCP)
 //
@@ -165,6 +166,33 @@ int mnet_recv(
             mnet_socket_t sock,
             void* buf,
             size_t len,
+            mnet_msg_flags_t flags);
+
+// ----------------------------------------------------------------
+// send multiple buffers in a single call. (vectored I/O)
+//
+// iov: array of buffer descriptors.
+// iovcnt: number of buffers in array.
+// flags: flags to send with.
+// ----------------------------------------------------------------
+// returns: number of bytes sent, or -1 on error.
+int mnet_sendv(
+            mnet_socket_t sock,
+            const mnet_iovec_t* iov,
+            int iovcnt,
+            mnet_msg_flags_t flags);
+
+// receive into multiple buffers in a single call. (vectored I/O)
+//
+// iov: array of buffer descriptors.
+// iovcnt: number of buffers in array.
+// flags: flags to receive with.
+// ----------------------------------------------------------------
+// returns: number of bytes received, 0 if connection closed, -1 on error.
+int mnet_recvv(
+            mnet_socket_t sock,
+            mnet_iovec_t* iov,
+            int iovcnt,
             mnet_msg_flags_t flags);
 
 
@@ -261,6 +289,41 @@ int mnet_getsockopt(
 // returns: mnet_ok on success, mnet_error on failure.
 mnet_result_t mnet_set_blocking(mnet_socket_t sock, int do_block);
 
+// ----------------------------------------------------------------
+// get the number of bytes available to read without blocking.
+//
+// bytes: [out] number of bytes available.
+// ----------------------------------------------------------------
+// returns: mnet_ok on success, mnet_error on failure.
+int mnet_available(mnet_socket_t sock, unsigned long* bytes);
+
+
+// ================================================
+//             I/O MULTIPLEXING (POLL)
+// ================================================
+
+
+// ----------------------------------------------------------------
+// poll multiple sockets for events.
+//
+// fds: array of mnet_pollfd_t structures.
+// nfds: number of elements in fds array.
+// timeout: timeout in milliseconds.
+//  (-1 = block forever, 0 = return immediately)
+// ----------------------------------------------------------------
+// returns: number of ready sockets, 0 on timeout, -1 on error.
+// NOTE: indices are preserved. fds[X] input corresponds to fds[X] output.
+int mnet_poll(mnet_pollfd_t* fds, int nfds, int timeout);
+
+// ----------------------------------------------------------------
+// check if a pollfd has a specific event set in revents.
+//
+// pfd: pollfd to check.
+// event: event to check for (mnet_pollin, mnet_pollout, etc.)
+// ----------------------------------------------------------------
+// returns: 1 if event is set, 0 otherwise.
+int mnet_pollfd_has_event(const mnet_pollfd_t* pfd, short event);
+
 
 // ================================================
 //           ADDRESS AND NAME RESOLUTION
@@ -291,6 +354,49 @@ int mnet_getpeername(
                 socklen_t* addrlen);
 
 // ----------------------------------------------------------------
+// resolve hostname to IP addresses. (DNS lookup)
+//
+// node: hostname or IP address string. (e.g., "google.com")
+// service: service name or port string. (e.g., "http" or "80")
+// hints: optional hints for resolution. (can be NULL)
+// res: [out] result list. (must be freed with mnet_freeaddrinfo)
+// ----------------------------------------------------------------
+// returns: mnet_ok on success, error code on failure.
+int mnet_getaddrinfo(
+                const char* node,
+                const char* service,
+                const struct addrinfo* hints,
+                struct addrinfo** res);
+
+// ----------------------------------------------------------------
+// free address info returned by mnet_getaddrinfo.
+//
+// res: address info to free.
+// ----------------------------------------------------------------
+void mnet_freeaddrinfo(struct addrinfo* res);
+
+// ----------------------------------------------------------------
+// get name information from a socket address. (reverse DNS)
+//
+// addr: socket address to convert.
+// addrlen: size of address.
+// host: [out] hostname buffer.     (can be NULL)
+// hostlen: size of host buffer.
+// serv: [out] service name buffer. (can be NULL)
+// servlen: size of service buffer.
+// flags: control flags.
+// ----------------------------------------------------------------
+// returns: mnet_ok on success, error code on failure.
+int mnet_getnameinfo(
+                const mnet_sockaddr_t* addr,
+                socklen_t addrlen,
+                char* host,
+                socklen_t hostlen,
+                char* serv,
+                socklen_t servlen,
+                int flags);
+
+// ----------------------------------------------------------------
 // convert ascii string IP to binary form.
 //
 // af: the address family.
@@ -300,6 +406,41 @@ int mnet_getpeername(
 // returns: mnet_ok on success, mnet_error on failure.
 int mnet_inet_pton(mnet_address_family_t af, const char* src, void* dst);
 
+// ----------------------------------------------------------------
+// convert binary IP to ascii string form.
+//
+// af: the address family.
+// src: binary form.
+// dst: ascii form buffer. (at least INET_ADDRSTRLEN or INET6_ADDRSTRLEN)
+// size: size of dst buffer.
+// ----------------------------------------------------------------
+// returns: pointer to dst on success, NULL on error.
+const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst, socklen_t size);
+
+
+// ================================================
+//              BYTE ORDER CONVERSION
+// ================================================
+
+// ----------------------------------------------------------------
+// convert 16-bit value from host to network byte order.
+// ----------------------------------------------------------------
+uint16_t mnet_htons(uint16_t hostshort);
+
+// ----------------------------------------------------------------
+// convert 16-bit value from network to host byte order.
+// ----------------------------------------------------------------
+uint16_t mnet_ntohs(uint16_t netshort);
+
+// ----------------------------------------------------------------
+// convert 32-bit value from host to network byte order.
+// ----------------------------------------------------------------
+uint32_t mnet_htonl(uint32_t hostlong);
+
+// ----------------------------------------------------------------
+// convert 32-bit value from network to host byte order.
+// ----------------------------------------------------------------
+uint32_t mnet_ntohl(uint32_t netlong);
 
 // ================================================
 //                  ERROR HANDLING
@@ -478,6 +619,71 @@ int mnet_recv(mnet_socket_t sock, void* buf, size_t len, mnet_msg_flags_t flags)
 #endif
 }
 
+int mnet_sendv(mnet_socket_t sock, const mnet_iovec_t* iov, int iovcnt, mnet_msg_flags_t flags)
+{
+    if (!iov || iovcnt <= 0) return -1;
+
+#ifdef MNET_WINDOWS
+    WSABUF* bufs = (WSABUF*)malloc(iovcnt * sizeof(WSABUF));
+    if (!bufs) return -1;
+
+    for (int i = 0; i < iovcnt; i++)
+    {
+        bufs[i].buf = (char*)iov[i].iov_base;
+        bufs[i].len = (ULONG)iov[i].iov_len;
+    }
+
+    DWORD sent = 0;
+    int result = WSASend(sock, bufs, iovcnt, &sent, (DWORD)flags, NULL, NULL);
+    free(bufs);
+
+    return result == 0 ? (int)sent : -1;
+
+#elif defined(MNET_UNIX)
+
+    struct msghdr msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_iov = (struct iovec*)iov;
+    msg.msg_iovlen = iovcnt;
+
+    return (int)sendmsg(sock, &msg, (int)flags);
+
+#endif
+}
+
+int mnet_recvv(mnet_socket_t sock, mnet_iovec_t* iov, int iovcnt, mnet_msg_flags_t flags)
+{
+    if (!iov || iovcnt <= 0) return -1;
+
+#ifdef MNET_WINDOWS
+
+    WSABUF* bufs = (WSABUF*)malloc(iovcnt * sizeof(WSABUF));
+    if (!bufs) return -1;
+
+    for (int i = 0; i < iovcnt; i++)
+    {
+        bufs[i].buf = (char*)iov[i].iov_base;
+        bufs[i].len = (ULONG)iov[i].iov_len;
+    }
+
+    DWORD received = 0;
+    DWORD flags_dword = (DWORD)flags;
+    int result = WSARecv(sock, bufs, iovcnt, &received, &flags_dword, NULL, NULL);
+    free(bufs);
+
+    return result == 0 ? (int)received : -1;
+
+#elif defined(MNET_UNIX)
+
+    struct msghdr msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_iov = (struct iovec*)iov;
+    msg.msg_iovlen = iovcnt;
+
+    return (int)recvmsg(sock, &msg, (int)flags);
+#endif
+}
+
 
 // ================================================
 //                DATA TRANSFER (UDP)
@@ -539,19 +745,54 @@ mnet_result_t mnet_set_blocking(mnet_socket_t sock, const int do_block)
 {
 #ifdef MNET_WINDOWS
 
-    u_long mode = (u_long)do_block;
-    return ioctlsocket(sock, FIONBIO, &mode);
+    u_long mode = do_block ? 0 : 1;
+    return ioctlsocket(sock, FIONBIO, &mode) == 0 ? mnet_ok : mnet_error;
 
 #elif defined(MNET_UNIX)
 
     int flags = fcntl(sock, F_GETFL, 0);
     if (flags == -1) return mnet_error;
 
-    if (do_block == 1) return fcntl(sock, F_SETFL, flags | ~O_NONBLOCK);
-    if (do_block == 0) return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-    return mnet_error;
+    if (do_block)
+        flags &= ~O_NONBLOCK;
+    else
+        flags |= O_NONBLOCK;
+
+    return fcntl(sock, F_SETFL, flags) == 0 ? mnet_ok : mnet_error;
 
 #endif
+}
+
+int mnet_available(mnet_socket_t sock, unsigned long* bytes)
+{
+    if (!bytes) return mnet_error;
+
+#ifdef MNET_WINDOWS
+    return ioctlsocket(sock, FIONREAD, bytes) == 0 ? mnet_ok : mnet_error;
+#elif defined(MNET_UNIX)
+    return ioctl(sock, FIONREAD, bytes) == 0 ? mnet_ok : mnet_error;
+#endif
+}
+
+// ================================================
+//             I/O MULTIPLEXING (POLL)
+// ================================================
+
+int mnet_poll(mnet_pollfd_t* fds, int nfds, int timeout)
+{
+    if (!fds) return mnet_error;
+
+#ifdef MNET_WINDOWS
+    return WSAPoll((WSAPOLLFD*)fds, nfds, timeout);
+#elif defined(MNET_UNIX)
+    return poll((struct pollfd*)fds, nfds, timeout);
+#endif
+}
+
+int mnet_pollfd_has_event(const mnet_pollfd_t* pfd, short event)
+{
+    if (!pfd) return 0;
+    return (pfd->revents & event) != 0;
 }
 
 
@@ -560,23 +801,75 @@ mnet_result_t mnet_set_blocking(mnet_socket_t sock, const int do_block)
 // ================================================
 
 
-int mnet_getsockname(mnet_socket_t sock, struct sockaddr* addr, socklen_t* addrlen)
+int mnet_getsockname(mnet_socket_t sock, mnet_sockaddr_t* addr, socklen_t* addrlen)
 {
     return getsockname(sock, addr, addrlen);
 }
 
-int mnet_getpeername(mnet_socket_t sock, struct sockaddr* addr, socklen_t* addrlen)
+int mnet_getpeername(mnet_socket_t sock, mnet_sockaddr_t* addr, socklen_t* addrlen)
 {
     return getpeername(sock, addr, addrlen);
+}
+
+int mnet_getaddrinfo(const char* node, const char* service,
+                     const struct addrinfo* hints, struct addrinfo** res)
+{
+    return getaddrinfo(node, service, hints, res);
+}
+
+void mnet_freeaddrinfo(struct addrinfo* res)
+{
+    freeaddrinfo(res);
+}
+
+int mnet_getnameinfo(const mnet_sockaddr_t* addr, socklen_t addrlen,
+                     char* host, socklen_t hostlen,
+                     char* serv, socklen_t servlen, int flags)
+{
+    return getnameinfo(addr, addrlen, host, hostlen, serv, servlen, flags);
 }
 
 int mnet_inet_pton(mnet_address_family_t af, const char* src, void* dst)
 {
 #ifdef MNET_WINDOWS
-    return InetPtonA(af, src, dst);
+    return InetPtonA((int)af, src, dst);
 #elif defined(MNET_UNIX)
-    return inet_pton(af, src, dst);
+    return inet_pton((int)af, src, dst);
 #endif
+}
+
+const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst, socklen_t size)
+{
+#ifdef MNET_WINDOWS
+    return InetNtopA((int)af, (void*)src, dst, size);
+#elif defined(MNET_UNIX)
+    return inet_ntop((int)af, src, dst, size);
+#endif
+}
+
+
+// ================================================
+//              BYTE ORDER CONVERSION
+// ================================================
+
+uint16_t mnet_htons(uint16_t hostshort)
+{
+    return htons(hostshort);
+}
+
+uint16_t mnet_ntohs(uint16_t netshort)
+{
+    return ntohs(netshort);
+}
+
+uint32_t mnet_htonl(uint32_t hostlong)
+{
+    return htonl(hostlong);
+}
+
+uint32_t mnet_ntohl(uint32_t netlong)
+{
+    return ntohl(netlong);
 }
 
 
