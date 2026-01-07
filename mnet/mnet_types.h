@@ -11,26 +11,26 @@
 #include "mnet_os.h"
 
 // return codes for mnet functions.
-typedef enum
+typedef enum mnet_result
 {
     mnet_ok                 = 0,
     mnet_error              = -1
 }mnet_result_t;
 
-typedef enum
+typedef enum mnet_address_family
 {
     mnet_af_inet            = AF_INET, // ipv4
     mnet_af_inet6           = AF_INET6 // ipv6
 }mnet_address_family_t;
 
-typedef enum
+typedef enum mnet_socket_type
 {
     mnet_sock_stream        = SOCK_STREAM,
     mnet_sock_dgram         = SOCK_DGRAM,
     mnet_sock_raw           = SOCK_RAW
 }mnet_socket_type_t;
 
-typedef enum
+typedef enum mnet_protocol
 {
     mnet_ipproto_default    = 0,
     mnet_ipproto_automatic  = 0,
@@ -40,7 +40,7 @@ typedef enum
     mnet_ipproto_icmp       = IPPROTO_ICMP
 }mnet_protocol_t;
 
-typedef enum
+typedef enum mnet_sockopt
 {
     mnet_so_reuseaddr       = SO_REUSEADDR,
     // (int) 1=enable 0=disable.
@@ -81,7 +81,7 @@ typedef enum
 
 }mnet_sockopt_t;
 
-typedef enum
+typedef enum mnet_sockopt_level
 {
     mnet_sol_socket         = SOL_SOCKET,
     mnet_ipproto_tcp_level  = IPPROTO_TCP,
@@ -90,7 +90,7 @@ typedef enum
 
 
 // check the WINDOWS version for documentation.
-typedef enum
+typedef enum mnet_error_code
 {
 #ifdef MNET_WINDOWS
 
@@ -141,8 +141,8 @@ typedef enum
 #endif
 }mnet_error_code_t;
 
-// check the WINDOWS version for documentation.
-typedef enum
+// check the MNET_WINDOWS version for documentation.
+typedef enum mnet_shutdown_code
 {
 #ifdef MNET_WINDOWS
 
@@ -162,10 +162,10 @@ typedef enum
     mnet_shut_rdwr          = SHUT_RDWR
 
 #endif
-}mnet_shutdown_t;
+}mnet_shutdown_code_t;
 
 // used as flags for some functions.
-typedef enum
+typedef enum mnet_msg_flags
 {
     mnet_msg_none           = 0,
     // no extra instruction.
