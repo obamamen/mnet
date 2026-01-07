@@ -39,6 +39,13 @@
 #   define MNET_INVALID_SOCKET (-1)
 #endif
 
+
+#ifdef MNET_WINDOWS
+    typedef WSABUF mnet_iovec_t;
+#elif defined(MNET_UNIX)
+    typedef struct iovec mnet_iovec_t;
+#endif
+
 typedef struct sockaddr     mnet_sockaddr_t;
 typedef struct sockaddr_in  mnet_sockaddr_in_t;
 typedef struct sockaddr_in6 mnet_sockaddr_in6_t;

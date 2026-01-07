@@ -169,6 +169,15 @@ int mnet_recv(
             mnet_msg_flags_t flags);
 
 // ----------------------------------------------------------------
+// initialize an iovec buffer descriptor.
+//
+// iov: [out] iovec to initialize.
+// base: pointer to buffer.
+// len: length of buffer.
+// ----------------------------------------------------------------
+void mnet_iovec_init(mnet_iovec_t* iov, void* base, size_t len);
+
+// ----------------------------------------------------------------
 // send multiple buffers in a single call. (vectored I/O)
 //
 // iov: array of buffer descriptors.
@@ -619,24 +628,27 @@ int mnet_recv(mnet_socket_t sock, void* buf, size_t len, mnet_msg_flags_t flags)
 #endif
 }
 
+void mnet_iovec_init(mnet_iovec_t* iov, void* base, size_t len)
+{
+    if (!iov) return;
+
+#ifdef MNET_WINDOWS
+    iov->buf = (char*)base;
+    iov->len = (ULONG)len;
+#elif defined(MNET_UNIX)
+    iov->iov_base = base;
+    iov->iov_len = len;
+#endif
+}
+
 int mnet_sendv(mnet_socket_t sock, const mnet_iovec_t* iov, int iovcnt, mnet_msg_flags_t flags)
 {
     if (!iov || iovcnt <= 0) return -1;
 
 #ifdef MNET_WINDOWS
-    WSABUF* bufs = (WSABUF*)malloc(iovcnt * sizeof(WSABUF));
-    if (!bufs) return -1;
-
-    for (int i = 0; i < iovcnt; i++)
-    {
-        bufs[i].buf = (char*)iov[i].iov_base;
-        bufs[i].len = (ULONG)iov[i].iov_len;
-    }
 
     DWORD sent = 0;
-    int result = WSASend(sock, bufs, iovcnt, &sent, (DWORD)flags, NULL, NULL);
-    free(bufs);
-
+    int result = WSASend(sock, (LPWSABUF)iov, iovcnt, &sent, (DWORD)flags, NULL, NULL);
     return result == 0 ? (int)sent : -1;
 
 #elif defined(MNET_UNIX)
@@ -657,20 +669,9 @@ int mnet_recvv(mnet_socket_t sock, mnet_iovec_t* iov, int iovcnt, mnet_msg_flags
 
 #ifdef MNET_WINDOWS
 
-    WSABUF* bufs = (WSABUF*)malloc(iovcnt * sizeof(WSABUF));
-    if (!bufs) return -1;
-
-    for (int i = 0; i < iovcnt; i++)
-    {
-        bufs[i].buf = (char*)iov[i].iov_base;
-        bufs[i].len = (ULONG)iov[i].iov_len;
-    }
-
     DWORD received = 0;
     DWORD flags_dword = (DWORD)flags;
-    int result = WSARecv(sock, bufs, iovcnt, &received, &flags_dword, NULL, NULL);
-    free(bufs);
-
+    int result = WSARecv(sock, (LPWSABUF)iov, iovcnt, &received, &flags_dword, NULL, NULL);
     return result == 0 ? (int)received : -1;
 
 #elif defined(MNET_UNIX)
@@ -681,6 +682,7 @@ int mnet_recvv(mnet_socket_t sock, mnet_iovec_t* iov, int iovcnt, mnet_msg_flags
     msg.msg_iovlen = iovcnt;
 
     return (int)recvmsg(sock, &msg, (int)flags);
+
 #endif
 }
 

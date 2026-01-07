@@ -30,12 +30,6 @@ typedef enum mnet_socket_type
     mnet_sock_raw           = SOCK_RAW
 }mnet_socket_type_t;
 
-typedef struct mnet_iovec
-{
-    void*  iov_base;// buffer start.
-    size_t iov_len; // length bytes.
-}mnet_iovec_t;
-
 typedef enum mnet_poll_events
 {
     mnet_pollin     = POLLIN,   // data to read
