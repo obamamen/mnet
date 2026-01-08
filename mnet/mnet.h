@@ -452,7 +452,6 @@ mnet_result_t mnet_get_family(
 // addr: socket address (IPv4 or IPv6).
 // ip_buf: [out] buffer for IP string.
 // ip_buf_size: size of ip_buf.
-// port: port number in host byte order. (can be NULL)
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
 int mnet_addr_ip_to_string(
