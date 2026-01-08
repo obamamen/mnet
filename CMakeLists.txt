@@ -7,7 +7,18 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 
-add_executable(mnet_development main.c)
+set(SOURCES
+        "main.c")
 
 add_subdirectory(mnet)
-target_link_libraries(mnet_development mnet)
+
+function(add_dev_executable TARGET_NAME DEFINE)
+    add_executable(${TARGET_NAME} ${SOURCES})
+    target_compile_definitions(${TARGET_NAME} PRIVATE ${DEFINE})
+    target_link_libraries(${TARGET_NAME} mnet)
+endfunction()
+
+
+add_dev_executable(mnet_development DEV_MAIN)
+add_dev_executable(mnet_development_client DEV_CLIENT)
+add_dev_executable(mnet_development_server DEV_SERVER)

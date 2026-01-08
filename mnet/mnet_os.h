@@ -52,4 +52,12 @@ typedef struct sockaddr_in6 mnet_sockaddr_in6_t;
 
 #define MNET_SOCKADDR(sockaddr_in) ((const struct sockaddr*)&(sockaddr_in))
 
+#define MNET_IPV4_STRLEN        INET_ADDRSTRLEN
+#define MNET_IPV6_STRLEN        INET6_ADDRSTRLEN
+#define MNET_IP_STRLEN          INET6_ADDRSTRLEN
+
+#define MNET_IPV4_ADDR_STRLEN   (INET_ADDRSTRLEN + 6)   //   :XXXXX
+#define MNET_IPV6_ADDR_STRLEN   (INET6_ADDRSTRLEN + 8)  // []:XXXXX
+#define MNET_ADDR_STRLEN        MNET_IPV6_ADDR_STRLEN
+
 #endif //MNET_MNET_OS_H

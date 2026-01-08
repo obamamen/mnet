@@ -127,6 +127,7 @@ mnet_socket_t mnet_accept(
 // addrlen: sizeof addr structure.
 // ----------------------------------------------------------------
 int mnet_connect(mnet_socket_t sock, const mnet_sockaddr_t* addr, socklen_t addrlen);
+#define MNET_CONNECT(socket, addr) mnet_connect(socket, (void*)&addr, sizeof(addr))
 
 // ----------------------------------------------------------------
 // shutdown part or all of a connection.
@@ -338,6 +339,7 @@ int mnet_pollfd_has_event(const mnet_pollfd_t* pfd, short event);
 //           ADDRESS AND NAME RESOLUTION
 // ================================================
 
+
 // ----------------------------------------------------------------
 // get the local address its bound to.
 //
@@ -426,6 +428,69 @@ int mnet_inet_pton(mnet_address_family_t af, const char* src, void* dst);
 // returns: pointer to dst on success, NULL on error.
 const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst, socklen_t size);
 
+
+// ================================================
+//              ADDRESS UTILITIES
+// ================================================
+
+
+// ----------------------------------------------------------------
+// get address family of a socket addres.
+//
+// addr: pointer to address.
+// af: pointer to address family.
+// ----------------------------------------------------------------
+// returns: mnet_address_family_t.
+mnet_result_t mnet_get_family(
+    const mnet_sockaddr_t* addr,
+    mnet_address_family_t* af);
+
+// ----------------------------------------------------------------
+// convert socket address IP to string representation.
+//  (e.g. "192.168.1.1"/"2001:db8:85a3:0:0:8a2e:370:7334"
+//
+// addr: socket address (IPv4 or IPv6).
+// ip_buf: [out] buffer for IP string.
+// ip_buf_size: size of ip_buf.
+// port: port number in host byte order. (can be NULL)
+// ----------------------------------------------------------------
+// returns: mnet_ok on success, mnet_error on failure.
+int mnet_addr_ip_to_string(
+            const mnet_sockaddr_t* addr,
+            char ip_buf[],
+            size_t ip_buf_size);
+
+// ----------------------------------------------------------------
+// convert socket address to string representation.
+//  (e.g. "192.168.1.1:80"/"2001:db8:85a3:0:0:8a2e:370:7334]:8001"
+//
+// addr: socket address (IPv4 or IPv6).
+// ip_buf: [out] buffer for IP string.
+// ip_buf_size: size of ip_buf.
+// ----------------------------------------------------------------
+// returns: mnet_ok on success, mnet_error on failure.
+int mnet_addr_to_string(
+            const mnet_sockaddr_t* addr,
+            char ip_buf[],
+            size_t ip_buf_size,
+            uint16_t port);
+
+// ----------------------------------------------------------------
+// get port from socket address.
+//
+// addr: socket address.
+// ----------------------------------------------------------------
+// returns: port in host byte order, or 0 on error.
+uint16_t mnet_addr_get_port(const mnet_sockaddr_t* addr);
+
+// ----------------------------------------------------------------
+// set port on socket address.
+//
+// addr: socket address.
+// port: port in host byte order.
+// ----------------------------------------------------------------
+// returns: mnet_ok on success, mnet_error on failure.
+int mnet_addr_set_port(mnet_sockaddr_t* addr, uint16_t port);
 
 // ================================================
 //              BYTE ORDER CONVERSION
@@ -847,6 +912,84 @@ const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst,
 #elif defined(MNET_UNIX)
     return inet_ntop((int)af, src, dst, size);
 #endif
+}
+
+
+// ================================================
+//              ADDRESS UTILITIES
+// ================================================
+
+
+mnet_result_t mnet_get_family(const mnet_sockaddr_t* addr, mnet_address_family_t* out_family)
+{
+    if (!addr || !out_family) return mnet_error;
+    *out_family = (mnet_address_family_t)addr->sa_family;
+    return mnet_ok;
+}
+
+int mnet_addr_ip_to_string(
+    const mnet_sockaddr_t* addr,
+    char ip_buf[],
+    size_t ip_buf_size)
+{
+    if (!addr || !ip_buf) return mnet_error;
+
+    if (addr->sa_family == AF_INET)
+    {
+        mnet_sockaddr_in_t* addr_in = (mnet_sockaddr_in_t*)addr;
+        if (mnet_inet_ntop(mnet_af_inet, &addr_in->sin_addr, ip_buf, ip_buf_size) == NULL)
+            return mnet_error;
+
+        return mnet_ok;
+    }
+    else if (addr->sa_family == AF_INET6)
+    {
+        mnet_sockaddr_in6_t* addr_in6 = (mnet_sockaddr_in6_t*)addr;
+        if (mnet_inet_ntop(mnet_af_inet6, &addr_in6->sin6_addr, ip_buf, ip_buf_size) == NULL)
+            return mnet_error;
+
+        return mnet_ok;
+    }
+}
+
+// mnet_addr_to_string.
+
+uint16_t mnet_addr_get_port(const mnet_sockaddr_t* addr)
+{
+    if (!addr) return 0;
+
+    if (addr->sa_family == AF_INET)
+    {
+        mnet_sockaddr_in_t* addr_in = (mnet_sockaddr_in_t*)addr;
+        return mnet_ntohs(addr_in->sin_port);
+    }
+    else if (addr->sa_family == AF_INET6)
+    {
+        const mnet_sockaddr_in6_t* addr_in6 = (mnet_sockaddr_in6_t*)addr;
+        return mnet_ntohs(addr_in6->sin6_port);
+    }
+
+    return 0;
+}
+
+int mnet_addr_set_port(mnet_sockaddr_t* addr, uint16_t port)
+{
+    if (!addr) return mnet_error;
+
+    if (addr->sa_family == AF_INET)
+    {
+        mnet_sockaddr_in_t* addr_in = (mnet_sockaddr_in_t*)addr;
+        addr_in->sin_port = mnet_htons(port);
+        return mnet_ok;
+    }
+    else if (addr->sa_family == AF_INET6)
+    {
+        mnet_sockaddr_in6_t* addr_in6 = (mnet_sockaddr_in6_t*)addr;
+        addr_in6->sin6_port = mnet_htons(port);
+        return mnet_ok;
+    }
+
+    return mnet_error;
 }
 
 
