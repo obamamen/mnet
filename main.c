@@ -19,80 +19,119 @@ void server()
 {
     printf("server()\n");
 
-    mnet_sockaddr_in_t host_addr;
-    mnet_socket_t host_socket;
-
-    host_socket = mnet_socket(
-        mnet_af_inet,
-        mnet_sock_stream,
-        mnet_ipproto_default);
-
-    mnet_addr_any_ipv4(
-        &host_addr,
-        2020);
-
-    mnet_bind(host_socket, MNET_SOCKADDR(host_addr), sizeof(host_addr));
-
-    if (mnet_socket_is_valid(host_socket))
+    mnet_socket_t server = mnet_socket(mnet_af_inet, mnet_sock_dgram, mnet_ipproto_udp);
+    if (!mnet_socket_is_valid(server))
     {
-        printf("valid socket: %llu \n", host_socket);
-    } else
-    {
-        printf("invalid socket: %llu \n", host_socket);
+        printf("Failed to create socket\n");
+        return;
     }
 
-    print_addr((mnet_sockaddr_t*)&host_addr);
+    mnet_sockaddr_in_t addr;
+    if (mnet_addr_any_ipv4(&addr, 9090) != mnet_ok)
+    {
+        printf("Failed to create address\n");
+        mnet_close(server);
+        return;
+    }
 
-    mnet_listen(host_socket, 1024);
+    if (mnet_bind(server, MNET_SOCKADDR(addr), sizeof(addr)) != mnet_ok)
+    {
+        printf("Failed to bind: %s\n", mnet_error_string(mnet_get_error()));
+        mnet_close(server);
+        return;
+    }
 
-    mnet_sockaddr_in_t client1_addr;
-    socklen_t client1_len;
-    mnet_accept(host_socket,
-        (void*)&client1_addr, &client1_len);
+    printf("UDP server listening on port 9090...\n");
 
-    print_addr((void*)&client1_addr);
+    while (1)
+    {
+        char buffer[1024];
+        mnet_sockaddr_in_t client_addr;
+        socklen_t client_len = sizeof(client_addr);
 
-    mnet_close(host_socket);
+        int bytes = mnet_recvfrom(server, buffer, sizeof(buffer) - 1,
+                                  mnet_msg_default,
+                                  (mnet_sockaddr_t*)&client_addr,
+                                  &client_len);
+
+        if (bytes > 0)
+        {
+            buffer[bytes] = '\0';  // Null terminate
+
+            char client_ip[MNET_IP_STRLEN];
+            const uint16_t client_port = mnet_addr_get_port((mnet_sockaddr_t*)&client_addr);
+            if (mnet_addr_ip_to_string((mnet_sockaddr_t*)&client_addr,
+                                   client_ip, sizeof(client_ip)) == mnet_ok)
+            {
+                printf("Received from %s:%u: %s\n", client_ip, client_port, buffer);
+            }
+
+            mnet_sendto(server, buffer, bytes, mnet_msg_default,
+                       (mnet_sockaddr_t*)&client_addr, client_len);
+        }
+        else if (bytes < 0)
+        {
+            printf("Error receiving: %s\n", mnet_error_string(mnet_get_error()));
+            break;
+        }
+    }
+
+    mnet_close(server);
 }
 
 void client()
 {
-    printf("client()\n");
-    struct addrinfo* google_addr;
-    mnet_getaddrinfo(
-        "google.com",
-        "http",
-        NULL,
-        &google_addr);
+    if (mnet_initialize() != 0)
+    {
+        printf("Failed to initialize mnet\n");
+        return;
+    }
 
-    print_addr(google_addr->ai_addr);
+    mnet_socket_t client = mnet_socket(mnet_af_inet, mnet_sock_dgram, mnet_ipproto_udp);
+    if (!mnet_socket_is_valid(client))
+    {
+        printf("Failed to create socket\n");
+        mnet_cleanup();
+        return;
+    }
 
-    mnet_freeaddrinfo(google_addr);
+    mnet_sockaddr_in_t server_addr;
+    if (mnet_addr_ipv4(&server_addr, "127.0.0.1", 9090) != mnet_ok)
+    {
+        printf("Failed to create address\n");
+        mnet_close(client);
+        return;
+    }
 
-    mnet_socket_t client_socket;
-    mnet_sockaddr_in_t host_addr;
+    const char* message = "Hello, UDP server!";
+    int sent = mnet_sendto(client, message, strlen(message), mnet_msg_default,
+                          MNET_SOCKADDR(server_addr), sizeof(server_addr));
 
-    client_socket = mnet_socket(
-        mnet_af_inet,
-        mnet_sock_stream,
-        mnet_ipproto_default);
+    if (sent > 0)
+    {
+        printf("Sent %d bytes to server\n", sent);
 
-    mnet_addr_ipv4(&host_addr,
-        "127.0.0.1",
-        2020);
+        char buffer[1024];
+        mnet_sockaddr_in_t from_addr;
+        socklen_t from_len = sizeof(from_addr);
 
-    MNET_CONNECT(
-        client_socket,
-        host_addr);
+        int bytes = mnet_recvfrom(client, buffer, sizeof(buffer) - 1,
+                                  mnet_msg_default,
+                                  (mnet_sockaddr_t*)&from_addr,
+                                  &from_len);
 
-    mnet_sockaddr_in_t local_addr;
-    socklen_t local_len;
-    mnet_getsockname(client_socket,
-        (void*)&local_addr, &local_len);
+        if (bytes > 0)
+        {
+            buffer[bytes] = '\0';
+            printf("Received echo: %s\n", buffer);
+        }
+    }
+    else
+    {
+        printf("Failed to send: %s\n", mnet_error_string(mnet_get_error()));
+    }
 
-    print_addr((void*)&local_addr);
-
-    mnet_close(client_socket);
+    mnet_close(client);
 }
 
 void dev_main()
