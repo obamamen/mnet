@@ -873,6 +873,7 @@ mnet_result_t mnet_cleanup(void)
 #ifdef MNET_WINDOWS
     WSACleanup();
 #endif
+    return mnet_ok;
 }
 
 
@@ -902,6 +903,7 @@ mnet_result_t mnet_socket_is_valid(mnet_socket_t sock)
 {
     return sock != MNET_INVALID_SOCKET;
 }
+
 
 // ================================================
 //         CONNECTION MANAGEMENT (TCP)
