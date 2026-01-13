@@ -4,8 +4,6 @@ set(SOURCES
 
 set(HEADERS
     mnet.h,
-    mnet_os.h
-
 )
 
 add_library(mnet ${SOURCES})
@@ -17,3 +15,20 @@ if(WIN32)
 elseif(UNIX)
     target_link_libraries(mnet PRIVATE pthread)
 endif()
+
+target_compile_options(mnet PRIVATE
+        $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:
+            -std=c99
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wenum-conversion
+            -Wconversion
+            -Werror
+        >
+
+        $<$<C_COMPILER_ID:MSVC>:
+            /W4
+            /WX
+        >
+)

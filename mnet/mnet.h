@@ -1,8 +1,11 @@
 /* ================================== *\
- @file     mnet.h
- @project  mnet
- @author   moosm
- @date     1/5/2026
+ mnet - single file networking library.
+
+ usage:
+    (in 1 .c file)
+    #define MNET_SOURCE
+    #include "mnet.h"
+
 *\ ================================== */
 
 ///////////////////////////////////
@@ -26,8 +29,224 @@
 
 #include <stdint.h>
 
-#include "mnet_os.h"
-#include "mnet_types.h"
+// ================================================================
+// PLATFORM DETECTION
+// ================================================================
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#   define MNET_WINDOWS
+#elif defined(__unix__) || defined(__unix) || defined(__linux__) || defined(__APPLE__)
+#   define MNET_UNIX
+#else
+#   error PLATFORM_NOT_SUPPORTED
+#endif
+
+// ================================================================
+// PLATFORM
+// ================================================================
+
+#ifdef MNET_WINDOWS
+#   define WIN32_LEAN_AND_MEAN
+#   include <winsock2.h>
+#   include <ws2tcpip.h>
+#   include <windows.h>
+
+    typedef SOCKET mnet_socket_t;
+#   define MNET_INVALID_SOCKET INVALID_SOCKET
+
+    typedef WSABUF mnet_iovec_t;
+
+#elif defined(MNET_UNIX)
+#   include <sys/types.h>
+#   include <sys/socket.h>
+#   include <sys/ioctl.h>
+#   include <netinet/in.h>
+#   include <netinet/tcp.h>
+#   include <arpa/inet.h>
+#   include <netdb.h>
+#   include <unistd.h>
+#   include <fcntl.h>
+#   include <errno.h>
+#   include <poll.h>
+
+    typedef int mnet_socket_t;
+#   define MNET_INVALID_SOCKET (-1)
+    typedef struct iovec mnet_iovec_t;
+#endif
+
+#define MNET_IPV4_STRLEN        INET_ADDRSTRLEN
+#define MNET_IPV6_STRLEN        INET6_ADDRSTRLEN
+#define MNET_IP_STRLEN          INET6_ADDRSTRLEN
+#define MNET_IPV4_ADDR_STRLEN   (INET_ADDRSTRLEN + 6)
+#define MNET_IPV6_ADDR_STRLEN   (INET6_ADDRSTRLEN + 8)
+#define MNET_ADDR_STRLEN        MNET_IPV6_ADDR_STRLEN
+
+typedef struct sockaddr         mnet_sockaddr_t;
+typedef struct sockaddr_in      mnet_sockaddr_in_t;
+typedef struct sockaddr_in6     mnet_sockaddr_in6_t;
+typedef struct sockaddr_storage mnet_sockaddr_storage;
+typedef socklen_t               mnet_socklen_t;
+
+typedef int mnet_platform_error_code_t;
+
+// ================================================================
+// GLOBAL MACROS
+// ================================================================
+
+#define MNET_SOCKADDR(sockaddr_in) ((const mnet_sockaddr_t*)&(sockaddr_in))
+
+
+
+// ================================================================
+// ENUMS & TYPES
+// ================================================================
+
+
+// return codes for mnet functions.
+typedef enum mnet_result
+{
+    mnet_ok                 = 0,
+    mnet_error              = -1
+} mnet_result_t;
+
+typedef enum mnet_address_family
+{
+    mnet_af_inet            = AF_INET,  // ipv4
+    mnet_af_inet6           = AF_INET6  // ipv6
+} mnet_address_family_t;
+
+typedef enum mnet_socket_type
+{
+    mnet_sock_stream        = SOCK_STREAM,
+    mnet_sock_dgram         = SOCK_DGRAM,
+    mnet_sock_raw           = SOCK_RAW
+} mnet_socket_type_t;
+
+typedef enum mnet_protocol
+{
+    mnet_ipproto_default    = 0,
+    mnet_ipproto_automatic  = 0,
+    mnet_ipproto_ip         = IPPROTO_IP,
+    mnet_ipproto_tcp        = IPPROTO_TCP,
+    mnet_ipproto_udp        = IPPROTO_UDP,
+    mnet_ipproto_icmp       = IPPROTO_ICMP
+} mnet_protocol_t;
+
+typedef enum mnet_sockopt
+{
+    mnet_so_reuseaddr       = SO_REUSEADDR,
+    // (int) 1=enable 0=disable.
+    // allows binding to a port in TIME_WAIT state.
+
+    mnet_so_keepalive       = SO_KEEPALIVE,
+    // TCP ONLY
+    // (int) 1=enable 0=disable.
+    // sends keepalive probes to detect dead peers.
+
+    mnet_so_broadcast       = SO_BROADCAST,
+    // UDP ONLY
+    // (int) 1=enable 0=disable.
+
+    mnet_so_rcvbuf          = SO_RCVBUF,
+    // (int) recv buffer resize. (not guaranteed)
+
+    mnet_so_sndbuf          = SO_SNDBUF,
+    // (int) send buffer resize. (not guaranteed)
+
+    mnet_so_rcvtimeo        = SO_RCVTIMEO,
+    // (struct timeval) timeout for receiving.
+
+    mnet_so_sndtimeo        = SO_SNDTIMEO,
+    // (struct timeval) timeout for sending.
+
+    mnet_so_error           = SO_ERROR,
+    // OUTPUT
+    // (int) error code.
+
+    mnet_so_type            = SO_TYPE,
+    // OUTPUT
+    // (int) get socket type.
+
+    mnet_tcp_nodelay        = TCP_NODELAY
+    // TCP ONLY , and on TCP level
+    // (int) 1=disable nagle 0=enable nagle (default).
+} mnet_sockopt_t;
+
+typedef enum
+{
+    mnet_sol_socket         = SOL_SOCKET,
+    mnet_ipproto_tcp_level  = IPPROTO_TCP,
+    mnet_ipproto_ip_level   = IPPROTO_IP
+} mnet_sockopt_level_t;
+
+typedef enum
+{
+    mnet_msg_none       = 0,
+    mnet_msg_default    = 0,
+    mnet_msg_peek       = MSG_PEEK,
+    mnet_msg_dontroute  = MSG_DONTROUTE,
+    mnet_msg_waitall    = MSG_WAITALL
+} mnet_msg_flags_t;
+
+typedef enum
+{
+    mnet_pollin     = POLLIN,
+    mnet_pollout    = POLLOUT,
+    mnet_pollerr    = POLLERR,
+    mnet_pollhup    = POLLHUP,
+    mnet_pollnval   = POLLNVAL
+} mnet_poll_events_t;
+
+typedef struct pollfd mnet_pollfd_t;
+
+typedef enum
+{
+    mnet_err_none           = 0,
+    mnet_err_wouldblock     = 1,
+    mnet_err_inprogress     = 2,
+    mnet_err_already        = 3,
+    mnet_err_connrefused    = 4,
+    mnet_err_connreset      = 5,
+    mnet_err_connaborted    = 6,
+    mnet_err_timedout       = 7,
+    mnet_err_isconn         = 8,
+    mnet_err_notconn        = 9,
+    mnet_err_shutdown       = 10,
+    mnet_err_netdown        = 11,
+    mnet_err_netunreach     = 12,
+    mnet_err_hostdown       = 13,
+    mnet_err_hostunreach    = 14,
+    mnet_err_addrinuse      = 15,
+    mnet_err_addrnotavail   = 16,
+    mnet_err_msgsize        = 17,
+    mnet_err_nobufs         = 18,
+    mnet_err_inval          = 19,
+    mnet_err_acces          = 20,
+    mnet_err_pipe           = 21,
+    mnet_err_unknown        = 999
+} mnet_error_code_t;
+
+typedef enum mnet_shutdown_code
+{
+#ifdef MNET_WINDOWS
+
+    mnet_shut_rd            = SD_RECEIVE,
+    // stop receiving.
+
+    mnet_shut_wr            = SD_SEND,
+    // stop writing.
+
+    mnet_shut_rdwr          = SD_BOTH
+    // stop both.
+
+#else
+
+    mnet_shut_rd            = SHUT_RD,
+    mnet_shut_wr            = SHUT_WR,
+    mnet_shut_rdwr          = SHUT_RDWR
+
+#endif
+} mnet_shutdown_code_t;
 
 
 // ================================================
@@ -98,7 +317,7 @@ int mnet_socket_is_valid(mnet_socket_t sock);
 int mnet_bind(
             mnet_socket_t sock,
             const mnet_sockaddr_t* addr,
-            socklen_t addrlen);
+            mnet_socklen_t addrlen);
 
 // ----------------------------------------------------------------
 // put a socket into listening  mode.
@@ -118,7 +337,7 @@ int mnet_listen(mnet_socket_t sock, int backlog);
 mnet_socket_t mnet_accept(
                         mnet_socket_t sock,
                         mnet_sockaddr_t* addr,
-                        socklen_t* addrlen);
+                        mnet_socklen_t* addrlen);
 
 // ----------------------------------------------------------------
 // connect to a server.
@@ -126,7 +345,7 @@ mnet_socket_t mnet_accept(
 // addr: server address.
 // addrlen: sizeof addr structure.
 // ----------------------------------------------------------------
-int mnet_connect(mnet_socket_t sock, const mnet_sockaddr_t* addr, socklen_t addrlen);
+int mnet_connect(mnet_socket_t sock, const mnet_sockaddr_t* addr, mnet_socklen_t addrlen);
 #define MNET_CONNECT(socket, addr) mnet_connect(socket, (void*)&addr, sizeof(addr))
 
 // ----------------------------------------------------------------
@@ -227,7 +446,7 @@ int mnet_sendto(
             size_t len,
             mnet_msg_flags_t flags,
             const mnet_sockaddr_t* dest_addr,
-            socklen_t addrlen);
+            mnet_socklen_t addrlen);
 
 // ----------------------------------------------------------------
 // receive data and get the sender's address. (UDP)
@@ -245,7 +464,7 @@ int mnet_recvfrom(
                 size_t len,
                 mnet_msg_flags_t flags,
                 mnet_sockaddr_t* src_addr,
-                socklen_t* addrlen);
+                mnet_socklen_t* addrlen);
 
 
 // ================================================
@@ -267,7 +486,7 @@ int mnet_setsockopt(
                 mnet_sockopt_level_t level,
                 mnet_sockopt_t optname,
                 const void* optval,
-                socklen_t optlen);
+                mnet_socklen_t optlen);
 
 // ----------------------------------------------------------------
 // get a socket option value.
@@ -283,7 +502,7 @@ int mnet_getsockopt(
                 mnet_sockopt_level_t level,
                 mnet_sockopt_t optname,
                 void* optval,
-                socklen_t* optlen);
+                mnet_socklen_t* optlen);
 
 
 // ================================================
@@ -350,7 +569,7 @@ int mnet_pollfd_has_event(const mnet_pollfd_t* pfd, short event);
 int mnet_getsockname(
             mnet_socket_t sock,
             mnet_sockaddr_t* addr,
-            socklen_t* addrlen);
+            mnet_socklen_t* addrlen);
 
 // ----------------------------------------------------------------
 // get the remote address it's connected to.
@@ -362,7 +581,7 @@ int mnet_getsockname(
 int mnet_getpeername(
                 mnet_socket_t sock,
                 mnet_sockaddr_t* addr,
-                socklen_t* addrlen);
+                mnet_socklen_t* addrlen);
 
 // ----------------------------------------------------------------
 // resolve hostname to IP addresses. (DNS lookup)
@@ -400,11 +619,11 @@ void mnet_freeaddrinfo(struct addrinfo* res);
 // returns: mnet_ok on success, error code on failure.
 int mnet_getnameinfo(
                 const mnet_sockaddr_t* addr,
-                socklen_t addrlen,
+                mnet_socklen_t addrlen,
                 char* host,
-                socklen_t hostlen,
+                mnet_socklen_t hostlen,
                 char* serv,
-                socklen_t servlen,
+                mnet_socklen_t servlen,
                 int flags);
 
 // ----------------------------------------------------------------
@@ -426,7 +645,7 @@ int mnet_inet_pton(mnet_address_family_t af, const char* src, void* dst);
 // size: size of dst buffer.
 // ----------------------------------------------------------------
 // returns: pointer to dst on success, NULL on error.
-const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst, socklen_t size);
+const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst, mnet_socklen_t size);
 
 
 // ================================================
@@ -435,7 +654,7 @@ const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst,
 
 
 // ----------------------------------------------------------------
-// get address family of a socket addres.
+// get address family of a socket address.
 //
 // addr: pointer to address.
 // af: pointer to address family.
@@ -522,13 +741,20 @@ uint32_t mnet_ntohl(uint32_t netlong);
 // ----------------------------------------------------------------
 // get the last error for this thread.
 // ----------------------------------------------------------------
-mnet_error_code_t mnet_get_error(void);
+mnet_platform_error_code_t mnet_get_platform_error(void);
+
+// ----------------------------------------------------------------
+// transform a platform error code into mnet equivalent.
+// ----------------------------------------------------------------
+mnet_error_code_t mnet_error_transform(mnet_platform_error_code_t platform_error);
+
+
 
 // ----------------------------------------------------------------
 // human readable ascii string representing the error code.
 // ----------------------------------------------------------------
 // returns: the string , DO NOT FREE.
-const char* mnet_error_string(mnet_error_code_t error_code);
+const char* mnet_error_string(mnet_platform_error_code_t error_code);
 
 
 // ================================================
@@ -643,7 +869,7 @@ int mnet_socket_is_valid(mnet_socket_t sock)
 // ================================================
 
 
-int mnet_bind(mnet_socket_t sock, const mnet_sockaddr_t* addr, socklen_t addrlen)
+int mnet_bind(mnet_socket_t sock, const mnet_sockaddr_t* addr, mnet_socklen_t addrlen)
 {
     return bind(sock, addr, addrlen);
 }
@@ -653,12 +879,12 @@ int mnet_listen(mnet_socket_t sock, int backlog)
     return listen(sock, backlog);
 }
 
-mnet_socket_t mnet_accept(mnet_socket_t sock, struct sockaddr *addr, socklen_t *addrlen)
+mnet_socket_t mnet_accept(mnet_socket_t sock, struct sockaddr *addr, mnet_socklen_t *addrlen)
 {
     return accept(sock, addr, addrlen);
 }
 
-int mnet_connect(mnet_socket_t sock, const struct sockaddr *addr, socklen_t addrlen)
+int mnet_connect(mnet_socket_t sock, const struct sockaddr *addr, mnet_socklen_t addrlen)
 {
     return connect(sock, addr, addrlen);
 }
@@ -712,7 +938,7 @@ int mnet_sendv(mnet_socket_t sock, const mnet_iovec_t* iov, int iovcnt, mnet_msg
 #ifdef MNET_WINDOWS
 
     DWORD sent = 0;
-    int result = WSASend(sock, (LPWSABUF)iov, iovcnt, &sent, (DWORD)flags, NULL, NULL);
+    const int result = WSASend(sock, (LPWSABUF)iov, (DWORD)iovcnt, &sent, (DWORD)flags, NULL, NULL);
     return result == 0 ? (int)sent : -1;
 
 #elif defined(MNET_UNIX)
@@ -735,7 +961,7 @@ int mnet_recvv(mnet_socket_t sock, mnet_iovec_t* iov, int iovcnt, mnet_msg_flags
 
     DWORD received = 0;
     DWORD flags_dword = (DWORD)flags;
-    int result = WSARecv(sock, (LPWSABUF)iov, iovcnt, &received, &flags_dword, NULL, NULL);
+    int result = WSARecv(sock, (LPWSABUF)iov, (DWORD)iovcnt, &received, &flags_dword, NULL, NULL);
     return result == 0 ? (int)received : -1;
 
 #elif defined(MNET_UNIX)
@@ -757,7 +983,7 @@ int mnet_recvv(mnet_socket_t sock, mnet_iovec_t* iov, int iovcnt, mnet_msg_flags
 
 
 int mnet_sendto(mnet_socket_t sock, const void* buf, size_t len, mnet_msg_flags_t flags,
-                const mnet_sockaddr_t* dest_addr, socklen_t addrlen)
+                const mnet_sockaddr_t* dest_addr, mnet_socklen_t addrlen)
 {
 #ifdef MNET_WINDOWS
     return sendto(sock, (const char*)buf, (int)len, (int)flags, dest_addr, addrlen);
@@ -767,7 +993,7 @@ int mnet_sendto(mnet_socket_t sock, const void* buf, size_t len, mnet_msg_flags_
 }
 
 int mnet_recvfrom(mnet_socket_t sock, void* buf, size_t len, mnet_msg_flags_t flags,
-                  mnet_sockaddr_t* src_addr, socklen_t* addrlen)
+                  mnet_sockaddr_t* src_addr, mnet_socklen_t* addrlen)
 {
 #ifdef MNET_WINDOWS
     return recvfrom(sock, (char*)buf, (int)len, (int)flags, src_addr, addrlen);
@@ -783,7 +1009,7 @@ int mnet_recvfrom(mnet_socket_t sock, void* buf, size_t len, mnet_msg_flags_t fl
 
 
 int mnet_setsockopt(mnet_socket_t sock, mnet_sockopt_level_t level, mnet_sockopt_t optname,
-                    const void* optval, socklen_t optlen)
+                    const void* optval, mnet_socklen_t optlen)
 {
 #ifdef MNET_WINDOWS
     return setsockopt(sock, (int)level, (int)optname, (const char*)optval, optlen);
@@ -793,7 +1019,7 @@ int mnet_setsockopt(mnet_socket_t sock, mnet_sockopt_level_t level, mnet_sockopt
 }
 
 int mnet_getsockopt(mnet_socket_t sock, mnet_sockopt_level_t level, mnet_sockopt_t optname,
-                    void* optval, socklen_t* optlen)
+                    void* optval, mnet_socklen_t* optlen)
 {
 #ifdef MNET_WINDOWS
     return getsockopt(sock, (int)level, (int)optname, (char*)optval, optlen);
@@ -812,7 +1038,7 @@ mnet_result_t mnet_set_blocking(mnet_socket_t sock, const int do_block)
 #ifdef MNET_WINDOWS
 
     u_long mode = do_block ? 0 : 1;
-    return ioctlsocket(sock, FIONBIO, &mode) == 0 ? mnet_ok : mnet_error;
+    return ioctlsocket(sock, (long int)FIONBIO, &mode) == 0 ? mnet_ok : mnet_error;
 
 #elif defined(MNET_UNIX)
 
@@ -849,7 +1075,7 @@ int mnet_poll(mnet_pollfd_t* fds, int nfds, int timeout)
     if (!fds) return mnet_error;
 
 #ifdef MNET_WINDOWS
-    return WSAPoll((WSAPOLLFD*)fds, nfds, timeout);
+    return WSAPoll((WSAPOLLFD*)fds, (ULONG)nfds, timeout);
 #elif defined(MNET_UNIX)
     return poll((struct pollfd*)fds, nfds, timeout);
 #endif
@@ -867,12 +1093,12 @@ int mnet_pollfd_has_event(const mnet_pollfd_t* pfd, short event)
 // ================================================
 
 
-int mnet_getsockname(mnet_socket_t sock, mnet_sockaddr_t* addr, socklen_t* addrlen)
+int mnet_getsockname(mnet_socket_t sock, mnet_sockaddr_t* addr, mnet_socklen_t* addrlen)
 {
     return getsockname(sock, addr, addrlen);
 }
 
-int mnet_getpeername(mnet_socket_t sock, mnet_sockaddr_t* addr, socklen_t* addrlen)
+int mnet_getpeername(mnet_socket_t sock, mnet_sockaddr_t* addr, mnet_socklen_t* addrlen)
 {
     return getpeername(sock, addr, addrlen);
 }
@@ -888,11 +1114,15 @@ void mnet_freeaddrinfo(struct addrinfo* res)
     freeaddrinfo(res);
 }
 
-int mnet_getnameinfo(const mnet_sockaddr_t* addr, socklen_t addrlen,
-                     char* host, socklen_t hostlen,
-                     char* serv, socklen_t servlen, int flags)
+int mnet_getnameinfo(const mnet_sockaddr_t* addr, mnet_socklen_t addrlen,
+                     char* host, mnet_socklen_t hostlen,
+                     char* serv, mnet_socklen_t servlen, int flags)
 {
+#ifdef MNET_WINDOWS
+    return getnameinfo(addr, addrlen, host, (DWORD)hostlen, serv, (DWORD)servlen, flags);
+#elif defined(MNET_UNIX)
     return getnameinfo(addr, addrlen, host, hostlen, serv, servlen, flags);
+#endif
 }
 
 int mnet_inet_pton(mnet_address_family_t af, const char* src, void* dst)
@@ -904,10 +1134,10 @@ int mnet_inet_pton(mnet_address_family_t af, const char* src, void* dst)
 #endif
 }
 
-const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst, socklen_t size)
+const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst, mnet_socklen_t size)
 {
 #ifdef MNET_WINDOWS
-    return InetNtopA((int)af, (void*)src, dst, size);
+    return InetNtopA((int)af, (void*)src, dst, (size_t)size);
 #elif defined(MNET_UNIX)
     return inet_ntop((int)af, src, dst, size);
 #endif
@@ -936,7 +1166,7 @@ int mnet_addr_ip_to_string(
     if (addr->sa_family == AF_INET)
     {
         mnet_sockaddr_in_t* addr_in = (mnet_sockaddr_in_t*)addr;
-        if (mnet_inet_ntop(mnet_af_inet, &addr_in->sin_addr, ip_buf, ip_buf_size) == NULL)
+        if (mnet_inet_ntop(mnet_af_inet, &addr_in->sin_addr, ip_buf, (mnet_socklen_t)ip_buf_size) == NULL)
             return mnet_error;
 
         return mnet_ok;
@@ -944,11 +1174,13 @@ int mnet_addr_ip_to_string(
     else if (addr->sa_family == AF_INET6)
     {
         mnet_sockaddr_in6_t* addr_in6 = (mnet_sockaddr_in6_t*)addr;
-        if (mnet_inet_ntop(mnet_af_inet6, &addr_in6->sin6_addr, ip_buf, ip_buf_size) == NULL)
+        if (mnet_inet_ntop(mnet_af_inet6, &addr_in6->sin6_addr, ip_buf, (mnet_socklen_t)ip_buf_size) == NULL)
             return mnet_error;
 
         return mnet_ok;
     }
+
+    return mnet_error;
 }
 
 // mnet_addr_to_string.
@@ -1022,7 +1254,7 @@ uint32_t mnet_ntohl(uint32_t netlong)
 // ================================================
 
 
-mnet_error_code_t mnet_get_error(void)
+mnet_platform_error_code_t mnet_get_platform_error(void)
 {
 #ifdef MNET_WINDOWS
     return WSAGetLastError();
@@ -1031,12 +1263,17 @@ mnet_error_code_t mnet_get_error(void)
 #endif
 }
 
-const char* mnet_error_string(mnet_error_code_t error_code)
+mnet_error_code_t mnet_error_transform(mnet_platform_error_code_t platform_error)
+{
+    return platform_error;
+}
+
+const char* mnet_error_string(mnet_platform_error_code_t error_code)
 {
 #ifdef MNET_WINDOWS
     static char buf[256];
     FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                   NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                   NULL, (DWORD)error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
                    buf, sizeof(buf), NULL);
     return buf;
 #elif defined(MNET_UNIX)

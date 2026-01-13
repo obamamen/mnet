@@ -36,7 +36,7 @@ void server()
 
     if (mnet_bind(server, MNET_SOCKADDR(addr), sizeof(addr)) != mnet_ok)
     {
-        printf("Failed to bind: %s\n", mnet_error_string(mnet_get_error()));
+        printf("Failed to bind: %s\n", mnet_error_string(mnet_get_platform_error()));
         mnet_close(server);
         return;
     }
@@ -66,12 +66,12 @@ void server()
                 printf("Received from %s:%u: %s\n", client_ip, client_port, buffer);
             }
 
-            mnet_sendto(server, buffer, bytes, mnet_msg_default,
+            mnet_sendto(server, buffer, (size_t)bytes, mnet_msg_default,
                        (mnet_sockaddr_t*)&client_addr, client_len);
         }
         else if (bytes < 0)
         {
-            printf("Error receiving: %s\n", mnet_error_string(mnet_get_error()));
+            printf("Error receiving: %s\n", mnet_error_string(mnet_get_platform_error()));
             break;
         }
     }
@@ -128,7 +128,7 @@ void client()
     }
     else
     {
-        printf("Failed to send: %s\n", mnet_error_string(mnet_get_error()));
+        printf("Failed to send: %s\n", mnet_error_string(mnet_get_platform_error()));
     }
 
     mnet_close(client);
