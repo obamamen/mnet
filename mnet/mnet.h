@@ -29,9 +29,9 @@
 
 #include <stdint.h>
 
-// ================================================================
+// ================================================
 // PLATFORM DETECTION
-// ================================================================
+//
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #   define MNET_WINDOWS
@@ -41,9 +41,9 @@
 #   error PLATFORM_NOT_SUPPORTED
 #endif
 
-// ================================================================
+// ================================================
 // PLATFORM
-// ================================================================
+//
 
 #ifdef MNET_WINDOWS
 #   define WIN32_LEAN_AND_MEAN
@@ -87,19 +87,19 @@ typedef struct sockaddr_in6     mnet_sockaddr_in6_t;
 typedef struct sockaddr_storage mnet_sockaddr_storage;
 typedef socklen_t               mnet_socklen_t;
 
-typedef int mnet_platform_error_code_t;
 
-// ================================================================
+// ================================================
 // GLOBAL MACROS
-// ================================================================
+//
+
 
 #define MNET_SOCKADDR(sockaddr_in) ((const mnet_sockaddr_t*)&(sockaddr_in))
 
 
 
-// ================================================================
+// ================================================
 // ENUMS & TYPES
-// ================================================================
+//
 
 
 // return codes for mnet functions.
@@ -201,30 +201,40 @@ typedef struct pollfd mnet_pollfd_t;
 
 typedef enum
 {
-    mnet_err_none           = 0,
-    mnet_err_wouldblock     = 1,
-    mnet_err_inprogress     = 2,
-    mnet_err_already        = 3,
-    mnet_err_connrefused    = 4,
-    mnet_err_connreset      = 5,
-    mnet_err_connaborted    = 6,
-    mnet_err_timedout       = 7,
-    mnet_err_isconn         = 8,
-    mnet_err_notconn        = 9,
-    mnet_err_shutdown       = 10,
-    mnet_err_netdown        = 11,
-    mnet_err_netunreach     = 12,
-    mnet_err_hostdown       = 13,
-    mnet_err_hostunreach    = 14,
-    mnet_err_addrinuse      = 15,
-    mnet_err_addrnotavail   = 16,
-    mnet_err_msgsize        = 17,
-    mnet_err_nobufs         = 18,
-    mnet_err_inval          = 19,
-    mnet_err_acces          = 20,
-    mnet_err_pipe           = 21,
-    mnet_err_unknown        = 999
-} mnet_error_code_t;
+#ifdef MNET_WINDOWS
+    mnet_ewouldblock    = WSAEWOULDBLOCK,
+    mnet_einprogress    = WSAEINPROGRESS,
+    mnet_ealready       = WSAEALREADY,
+    mnet_econnrefused   = WSAECONNREFUSED,
+    mnet_econnreset     = WSAECONNRESET,
+    mnet_etimedout      = WSAETIMEDOUT,
+    mnet_eaddrinuse     = WSAEADDRINUSE,
+    mnet_eaddrnotavail  = WSAEADDRNOTAVAIL,
+    mnet_eisconn        = WSAEISCONN,
+    mnet_enotconn       = WSAENOTCONN,
+    mnet_enetdown       = WSAENETDOWN,
+    mnet_enetunreach    = WSAENETUNREACH,
+    mnet_ehostunreach   = WSAEHOSTUNREACH,
+    mnet_emsgsize       = WSAEMSGSIZE,
+    mnet_enobufs        = WSAENOBUFS
+#else
+    mnet_ewouldblock    = EWOULDBLOCK,
+    mnet_einprogress    = EINPROGRESS,
+    mnet_ealready       = EALREADY,
+    mnet_econnrefused   = ECONNREFUSED,
+    mnet_econnreset     = ECONNRESET,
+    mnet_etimedout      = ETIMEDOUT,
+    mnet_eaddrinuse     = EADDRINUSE,
+    mnet_eaddrnotavail  = EADDRNOTAVAIL,
+    mnet_eisconn        = EISCONN,
+    mnet_enotconn       = ENOTCONN,
+    mnet_enetdown       = ENETDOWN,
+    mnet_enetunreach    = ENETUNREACH,
+    mnet_ehostunreach   = EHOSTUNREACH,
+    mnet_emsgsize       = EMSGSIZE,
+    mnet_enobufs        = ENOBUFS
+#endif
+} mnet_error_t;
 
 typedef enum mnet_shutdown_code
 {
@@ -251,7 +261,7 @@ typedef enum mnet_shutdown_code
 
 // ================================================
 // INITIALIZATION & CLEANUP
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -260,7 +270,7 @@ typedef enum mnet_shutdown_code
 // must be called before any mnet functions are called.
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
-int mnet_initialize(void);
+mnet_result_t mnet_initialize(void);
 
 // ----------------------------------------------------------------
 // cleanup networking resources.
@@ -268,12 +278,12 @@ int mnet_initialize(void);
 // should be called when done using library,
 //  or at end of program.
 // ----------------------------------------------------------------
-void mnet_cleanup(void);
+mnet_result_t mnet_cleanup(void);
 
 
 // ================================================
 //       CORE SOCKET CREATION AND MANAGEMENT
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -293,18 +303,18 @@ mnet_socket_t mnet_socket(
 // close a socket.
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
-int mnet_close(mnet_socket_t sock);
+mnet_result_t mnet_close(mnet_socket_t sock);
 
 // ----------------------------------------------------------------
 // check if a socket handle is valid.
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
-int mnet_socket_is_valid(mnet_socket_t sock);
+mnet_result_t mnet_socket_is_valid(mnet_socket_t sock);
 
 
 // ================================================
 //         CONNECTION MANAGEMENT (TCP)
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -325,7 +335,7 @@ int mnet_bind(
 // backlog: maximum pending connection queue.
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
-int mnet_listen(mnet_socket_t sock, int backlog);
+mnet_result_t mnet_listen(mnet_socket_t sock, int backlog);
 
 // ----------------------------------------------------------------
 // accept incoming connection. (blocks by default)
@@ -345,19 +355,19 @@ mnet_socket_t mnet_accept(
 // addr: server address.
 // addrlen: sizeof addr structure.
 // ----------------------------------------------------------------
-int mnet_connect(mnet_socket_t sock, const mnet_sockaddr_t* addr, mnet_socklen_t addrlen);
+mnet_result_t mnet_connect(mnet_socket_t sock, const mnet_sockaddr_t *addr, mnet_socklen_t addrlen);
 #define MNET_CONNECT(socket, addr) mnet_connect(socket, (void*)&addr, sizeof(addr))
 
 // ----------------------------------------------------------------
 // shutdown part or all of a connection.
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
-int mnet_shutdown(mnet_socket_t sock, mnet_shutdown_code_t how);
+mnet_result_t mnet_shutdown(mnet_socket_t sock, mnet_shutdown_code_t how);
 
 
 // ================================================
 //               DATA TRANSFER (TCP)
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -368,11 +378,11 @@ int mnet_shutdown(mnet_socket_t sock, mnet_shutdown_code_t how);
 // flags: flags to send with.
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
-int mnet_send(
-            mnet_socket_t sock,
-            const void* buf,
-            size_t len,
-            mnet_msg_flags_t flags);
+mnet_result_t mnet_send(
+                    mnet_socket_t sock,
+                    const void* buf,
+                    size_t len,
+                    mnet_msg_flags_t flags);
 
 // ----------------------------------------------------------------
 // receive data from the connected socket on the other end.
@@ -382,7 +392,7 @@ int mnet_send(
 // flags: flags to receive with.
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
-int mnet_recv(
+mnet_result_t mnet_recv(
             mnet_socket_t sock,
             void* buf,
             size_t len,
@@ -395,7 +405,33 @@ int mnet_recv(
 // base: pointer to buffer.
 // len: length of buffer.
 // ----------------------------------------------------------------
-void mnet_iovec_init(mnet_iovec_t* iov, void* base, size_t len);
+void    mnet_iovec_init(mnet_iovec_t* iov, void* base, size_t len);
+
+// ----------------------------------------------------------------
+// get pointer to the base pointer.
+// ----------------------------------------------------------------
+void**  mnet_iovec_base(const mnet_iovec_t* iov);
+
+// ----------------------------------------------------------------
+// get base pointer.
+// ----------------------------------------------------------------
+// returns: just the base.
+void*   mnet_iovec_get_base(mnet_iovec_t iov);
+
+// ----------------------------------------------------------------
+// set base pointer.
+// ----------------------------------------------------------------
+void    mnet_iovec_set_base(mnet_iovec_t* iov, void* base);
+
+// ----------------------------------------------------------------
+// get len.
+// ----------------------------------------------------------------
+size_t mnet_iovec_get_len(mnet_iovec_t iov);
+
+// ----------------------------------------------------------------
+// set len.
+// ----------------------------------------------------------------
+void    mnet_iovec_set_len(mnet_iovec_t* iov, size_t len);
 
 // ----------------------------------------------------------------
 // send multiple buffers in a single call. (vectored I/O)
@@ -427,7 +463,7 @@ int mnet_recvv(
 
 // ================================================
 //                DATA TRANSFER (UDP)
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -469,7 +505,7 @@ int mnet_recvfrom(
 
 // ================================================
 //                  SOCKET OPTIONS
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -507,7 +543,7 @@ int mnet_getsockopt(
 
 // ================================================
 //              EXTRA SOCKET CONTROL
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -517,6 +553,8 @@ int mnet_getsockopt(
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
 mnet_result_t mnet_set_blocking(mnet_socket_t sock, int do_block);
+
+mnet_result_t mnet_set_reuseaddr(mnet_socket_t sock, int do_reuse);
 
 // ----------------------------------------------------------------
 // get the number of bytes available to read without blocking.
@@ -529,7 +567,7 @@ int mnet_available(mnet_socket_t sock, unsigned long* bytes);
 
 // ================================================
 //             I/O MULTIPLEXING (POLL)
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -556,7 +594,7 @@ int mnet_pollfd_has_event(const mnet_pollfd_t* pfd, short event);
 
 // ================================================
 //           ADDRESS AND NAME RESOLUTION
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -650,7 +688,7 @@ const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst,
 
 // ================================================
 //              ADDRESS UTILITIES
-// ================================================
+//
 
 
 // ----------------------------------------------------------------
@@ -712,7 +750,7 @@ int mnet_addr_set_port(mnet_sockaddr_t* addr, uint16_t port);
 
 // ================================================
 //              BYTE ORDER CONVERSION
-// ================================================
+//
 
 // ----------------------------------------------------------------
 // convert 16-bit value from host to network byte order.
@@ -736,31 +774,32 @@ uint32_t mnet_ntohl(uint32_t netlong);
 
 // ================================================
 //                  ERROR HANDLING
-// ================================================
+//
 
 // ----------------------------------------------------------------
 // get the last error for this thread.
 // ----------------------------------------------------------------
-mnet_platform_error_code_t mnet_get_platform_error(void);
-
-// ----------------------------------------------------------------
-// transform a platform error code into mnet equivalent.
-// ----------------------------------------------------------------
-mnet_error_code_t mnet_error_transform(mnet_platform_error_code_t platform_error);
-
+mnet_error_t mnet_get_platform_error(void);
 
 
 // ----------------------------------------------------------------
 // human readable ascii string representing the error code.
+//
+// NOTE: this is NOT thread-safe use mnet_error_string_r(...)
+//  for multithreaded environments.
 // ----------------------------------------------------------------
 // returns: the string , DO NOT FREE.
-const char* mnet_error_string(mnet_platform_error_code_t error_code);
+const char* mnet_error_string(mnet_error_t error_code);
+
+// ----------------------------------------------------------------
+// human readable ascii string representing the error code.
+// ----------------------------------------------------------------
+void mnet_error_string_r(mnet_error_t error_code, char* buf, size_t bufsize);
 
 
 // ================================================
 //              ADDRESS CREATORS
-// ================================================
-
+//
 
 // ----------------------------------------------------------------
 // create an IPv4 address structure.
@@ -812,10 +851,10 @@ int mnet_addr_any_ipv6( mnet_sockaddr_in6_t*    addr,                   uint16_t
 
 // ================================================
 // INITIALIZATION & CLEANUP
-// ================================================
+//
 
 
-int mnet_initialize(void)
+mnet_result_t mnet_initialize(void)
 {
 #ifdef MNET_WINDOWS
 
@@ -829,7 +868,7 @@ int mnet_initialize(void)
 #endif
 }
 
-void mnet_cleanup(void)
+mnet_result_t mnet_cleanup(void)
 {
 #ifdef MNET_WINDOWS
     WSACleanup();
@@ -839,7 +878,7 @@ void mnet_cleanup(void)
 
 // ================================================
 //       CORE SOCKET CREATION AND MANAGEMENT
-// ================================================
+//
 
 
 mnet_socket_t mnet_socket(
@@ -850,7 +889,7 @@ mnet_socket_t mnet_socket(
     return socket((int)domain, (int)type, (int)protocol);
 }
 
-int mnet_close(mnet_socket_t sock)
+mnet_result_t mnet_close(mnet_socket_t sock)
 {
 #ifdef MNET_WINDOWS
     return closesocket(sock);
@@ -859,14 +898,14 @@ int mnet_close(mnet_socket_t sock)
 #endif
 }
 
-int mnet_socket_is_valid(mnet_socket_t sock)
+mnet_result_t mnet_socket_is_valid(mnet_socket_t sock)
 {
     return sock != MNET_INVALID_SOCKET;
 }
 
 // ================================================
 //         CONNECTION MANAGEMENT (TCP)
-// ================================================
+//
 
 
 int mnet_bind(mnet_socket_t sock, const mnet_sockaddr_t* addr, mnet_socklen_t addrlen)
@@ -874,7 +913,7 @@ int mnet_bind(mnet_socket_t sock, const mnet_sockaddr_t* addr, mnet_socklen_t ad
     return bind(sock, addr, addrlen);
 }
 
-int mnet_listen(mnet_socket_t sock, int backlog)
+mnet_result_t mnet_listen(mnet_socket_t sock, int backlog)
 {
     return listen(sock, backlog);
 }
@@ -884,12 +923,12 @@ mnet_socket_t mnet_accept(mnet_socket_t sock, struct sockaddr *addr, mnet_sockle
     return accept(sock, addr, addrlen);
 }
 
-int mnet_connect(mnet_socket_t sock, const struct sockaddr *addr, mnet_socklen_t addrlen)
+mnet_result_t mnet_connect(mnet_socket_t sock, const struct sockaddr *addr, mnet_socklen_t addrlen)
 {
     return connect(sock, addr, addrlen);
 }
 
-int mnet_shutdown(mnet_socket_t sock, mnet_shutdown_code_t how)
+mnet_result_t mnet_shutdown(mnet_socket_t sock, mnet_shutdown_code_t how)
 {
     return shutdown(sock, (int)how);
 }
@@ -897,10 +936,10 @@ int mnet_shutdown(mnet_socket_t sock, mnet_shutdown_code_t how)
 
 // ================================================
 //               DATA TRANSFER (TCP)
-// ================================================
+//
 
 
-int mnet_send(mnet_socket_t sock, const void* buf, size_t len, mnet_msg_flags_t flags)
+mnet_result_t mnet_send(mnet_socket_t sock, const void *buf, size_t len, mnet_msg_flags_t flags)
 {
 #ifdef MNET_WINDOWS
     return send(sock, (const char*)buf, (int)len, (int)flags);
@@ -909,7 +948,7 @@ int mnet_send(mnet_socket_t sock, const void* buf, size_t len, mnet_msg_flags_t 
 #endif
 }
 
-int mnet_recv(mnet_socket_t sock, void* buf, size_t len, mnet_msg_flags_t flags)
+mnet_result_t mnet_recv(mnet_socket_t sock, void *buf, size_t len, mnet_msg_flags_t flags)
 {
 #ifdef MNET_WINDOWS
     return recv(sock, (char*)buf, (int)len, (int)flags);
@@ -928,6 +967,40 @@ void mnet_iovec_init(mnet_iovec_t* iov, void* base, size_t len)
 #elif defined(MNET_UNIX)
     iov->iov_base = base;
     iov->iov_len = len;
+#endif
+}
+
+void** mnet_iovec_base(
+    const mnet_iovec_t* iov)
+{
+    return (void**)(&iov->buf);
+}
+
+void* mnet_iovec_get_base(
+    const mnet_iovec_t iov)
+{
+    return (void*)iov.buf;
+}
+
+void mnet_iovec_set_base(
+    mnet_iovec_t* iov,
+    void* base)
+{
+    iov->buf = (void*)base;
+}
+
+size_t mnet_iovec_get_len(
+    const mnet_iovec_t iov)
+{
+    return (size_t)iov.len;
+}
+
+void mnet_iovec_set_len(mnet_iovec_t* iov, size_t len)
+{
+#ifdef MNET_WINDOWS
+    iov->len = (u_long)len;
+#elif defined(MNET_UNIX)
+    iov->len = (size_t)len;
 #endif
 }
 
@@ -979,7 +1052,7 @@ int mnet_recvv(mnet_socket_t sock, mnet_iovec_t* iov, int iovcnt, mnet_msg_flags
 
 // ================================================
 //                DATA TRANSFER (UDP)
-// ================================================
+//
 
 
 int mnet_sendto(mnet_socket_t sock, const void* buf, size_t len, mnet_msg_flags_t flags,
@@ -1005,7 +1078,7 @@ int mnet_recvfrom(mnet_socket_t sock, void* buf, size_t len, mnet_msg_flags_t fl
 
 // ================================================
 //                  SOCKET OPTIONS
-// ================================================
+//
 
 
 int mnet_setsockopt(mnet_socket_t sock, mnet_sockopt_level_t level, mnet_sockopt_t optname,
@@ -1031,7 +1104,7 @@ int mnet_getsockopt(mnet_socket_t sock, mnet_sockopt_level_t level, mnet_sockopt
 
 // ================================================
 //              EXTRA SOCKET CONTROL
-// ================================================
+//
 
 mnet_result_t mnet_set_blocking(mnet_socket_t sock, const int do_block)
 {
@@ -1055,6 +1128,25 @@ mnet_result_t mnet_set_blocking(mnet_socket_t sock, const int do_block)
 #endif
 }
 
+mnet_result_t mnet_set_reuseaddr(
+    const mnet_socket_t sock,
+    const int do_reuse)
+{
+    if (sock == MNET_INVALID_SOCKET) return mnet_error;
+
+    int optval = do_reuse ? 1 : 0;
+
+#ifdef MNET_WINDOWS
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&optval, sizeof(optval)) != 0)
+        return mnet_error;
+#elif defined(MNET_UNIX)
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) != 0)
+        return mnet_error;
+#endif
+
+    return mnet_ok;
+}
+
 int mnet_available(mnet_socket_t sock, unsigned long* bytes)
 {
     if (!bytes) return mnet_error;
@@ -1068,7 +1160,7 @@ int mnet_available(mnet_socket_t sock, unsigned long* bytes)
 
 // ================================================
 //             I/O MULTIPLEXING (POLL)
-// ================================================
+//
 
 int mnet_poll(mnet_pollfd_t* fds, int nfds, int timeout)
 {
@@ -1090,7 +1182,7 @@ int mnet_pollfd_has_event(const mnet_pollfd_t* pfd, short event)
 
 // ================================================
 //           ADDRESS AND NAME RESOLUTION
-// ================================================
+//
 
 
 int mnet_getsockname(mnet_socket_t sock, mnet_sockaddr_t* addr, mnet_socklen_t* addrlen)
@@ -1146,7 +1238,7 @@ const char* mnet_inet_ntop(mnet_address_family_t af, const void* src, char* dst,
 
 // ================================================
 //              ADDRESS UTILITIES
-// ================================================
+//
 
 
 mnet_result_t mnet_get_family(const mnet_sockaddr_t* addr, mnet_address_family_t* out_family)
@@ -1226,7 +1318,7 @@ int mnet_addr_set_port(mnet_sockaddr_t* addr, uint16_t port)
 
 // ================================================
 //              BYTE ORDER CONVERSION
-// ================================================
+//
 
 uint16_t mnet_htons(uint16_t hostshort)
 {
@@ -1251,24 +1343,20 @@ uint32_t mnet_ntohl(uint32_t netlong)
 
 // ================================================
 //                  ERROR HANDLING
-// ================================================
+//
 
 
-mnet_platform_error_code_t mnet_get_platform_error(void)
+mnet_error_t mnet_get_platform_error(void)
 {
 #ifdef MNET_WINDOWS
-    return WSAGetLastError();
+    return (mnet_error_t)WSAGetLastError();
 #elif defined(MNET_UNIX)
-    return errno;
+    return (mnet_error_t)errno;
 #endif
 }
 
-mnet_error_code_t mnet_error_transform(mnet_platform_error_code_t platform_error)
-{
-    return platform_error;
-}
-
-const char* mnet_error_string(mnet_platform_error_code_t error_code)
+const char* mnet_error_string(
+    const mnet_error_t error_code)
 {
 #ifdef MNET_WINDOWS
     static char buf[256];
@@ -1281,10 +1369,21 @@ const char* mnet_error_string(mnet_platform_error_code_t error_code)
 #endif
 }
 
+void mnet_error_string_r(mnet_error_t error_code, char* buf, size_t bufsize)
+{
+#ifdef MNET_WINDOWS
+    FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                   NULL, (DWORD)error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                   buf, (DWORD)bufsize, NULL);
+#elif defined(MNET_UNIX)
+    strerror_r(error_code, buf, bufsize);
+#endif
+}
+
 
 // ================================================
 //              ADDRESS CREATORS
-// ================================================
+//
 
 
 int mnet_addr_ipv4(struct sockaddr_in *addr, const char *ip, uint16_t port)
