@@ -136,7 +136,7 @@ void client()
 
 void dev_main()
 {
-
+    printf("%s", MNET_VERSION_STRING);
 }
 
 int main(void)

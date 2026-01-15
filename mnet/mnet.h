@@ -8,24 +8,23 @@
 
 *\ ================================== */
 
-///////////////////////////////////
-// ...
-///////////////////////////////////
-
-// ================================================
-// ...
-// ================================================
-
-// ----------------------------------------------------------------
-// ...
-// ----------------------------------------------------------------
-
-
 ///////////////////////////////////////
 //             INTERFACE
 ///////////////////////////////////////
 #ifndef MNET_MNET_H
 #define MNET_MNET_H
+
+#define MNET_VERSION_MAJOR 1
+#define MNET_VERSION_MINOR 0
+
+#define MNET_VERSION_TRANSFORM(major, minor) (major * 100 + minor)
+#define MNET_VERSION MNET_VERSION_TRANSFORM(MNET_VERSION_MAJOR, MNET_VERSION_MINOR)
+
+#define MNET_STRINGIFY(x) #x
+#define MNET_STRINGIFY_1(x) MNET_STRINGIFY(x)
+
+#define MNET_VERSION_STRING \
+    MNET_STRINGIFY_1(MNET_VERSION_MAJOR) "." MNET_STRINGIFY_1(MNET_VERSION_MINOR)
 
 #include <stdint.h>
 
@@ -952,7 +951,7 @@ mnet_result_t mnet_shutdown(mnet_socket_t sock, mnet_shutdown_code_t how)
 //
 
 
-mnet_result_t mnet_send(mnet_socket_t sock, const void *buf, size_t len, mnet_msg_flags_t flags)
+int mnet_send(mnet_socket_t sock, const void *buf, size_t len, mnet_msg_flags_t flags)
 {
 #ifdef MNET_WINDOWS
     return send(sock, (const char*)buf, (int)len, (int)flags);
@@ -961,7 +960,7 @@ mnet_result_t mnet_send(mnet_socket_t sock, const void *buf, size_t len, mnet_ms
 #endif
 }
 
-mnet_result_t mnet_recv(mnet_socket_t sock, void *buf, size_t len, mnet_msg_flags_t flags)
+int mnet_recv(mnet_socket_t sock, void *buf, size_t len, mnet_msg_flags_t flags)
 {
 #ifdef MNET_WINDOWS
     return recv(sock, (char*)buf, (int)len, (int)flags);
