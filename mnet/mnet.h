@@ -182,7 +182,7 @@ typedef enum
 typedef enum
 {
     mnet_msg_none       = 0,
-    mnet_msg_default    = 0,
+    mnet_msg_default    = mnet_msg_none,
     mnet_msg_peek       = MSG_PEEK,
     mnet_msg_dontroute  = MSG_DONTROUTE,
     mnet_msg_waitall    = MSG_WAITALL
@@ -324,7 +324,7 @@ mnet_result_t mnet_socket_is_valid(mnet_socket_t sock);
 // addrlen: sizeof of addr structure.
 // ----------------------------------------------------------------
 // returns: mnet_ok on success, mnet_error on failure.
-int mnet_bind(
+mnet_result_t mnet_bind(
             mnet_socket_t sock,
             const mnet_sockaddr_t* addr,
             mnet_socklen_t addrlen);
@@ -355,6 +355,7 @@ mnet_socket_t mnet_accept(
 // addr: server address.
 // addrlen: sizeof addr structure.
 // ----------------------------------------------------------------
+// returns: mnet_ok on success, mnet_error on failure.
 mnet_result_t mnet_connect(mnet_socket_t sock, const mnet_sockaddr_t *addr, mnet_socklen_t addrlen);
 #define MNET_CONNECT(socket, addr) mnet_connect(socket, (void*)&addr, sizeof(addr))
 
@@ -377,12 +378,14 @@ mnet_result_t mnet_shutdown(mnet_socket_t sock, mnet_shutdown_code_t how);
 // len: number of bytes to send. (shouldn't be more than the buffers size)
 // flags: flags to send with.
 // ----------------------------------------------------------------
-// returns: mnet_ok on success, mnet_error on failure.
-mnet_result_t mnet_send(
-                    mnet_socket_t sock,
-                    const void* buf,
-                    size_t len,
-                    mnet_msg_flags_t flags);
+// returns:
+//  ( >= 0 )    count of bytes send.
+//  ( < 0 )     error.
+int mnet_send(
+            mnet_socket_t sock,
+            const void* buf,
+            size_t len,
+            mnet_msg_flags_t flags);
 
 // ----------------------------------------------------------------
 // receive data from the connected socket on the other end.
@@ -391,8 +394,11 @@ mnet_result_t mnet_send(
 // len: maximum bytes to receive. (shouldn't be more than the buffers size)
 // flags: flags to receive with.
 // ----------------------------------------------------------------
-// returns: mnet_ok on success, mnet_error on failure.
-mnet_result_t mnet_recv(
+// returns:
+//  ( > 0 )     count of bytes send.
+//  ( == 0 )    gracefull disconnect.
+//  ( < 0 )     error.
+int mnet_recv(
             mnet_socket_t sock,
             void* buf,
             size_t len,
@@ -440,7 +446,9 @@ void    mnet_iovec_set_len(mnet_iovec_t* iov, size_t len);
 // iovcnt: number of buffers in array.
 // flags: flags to send with.
 // ----------------------------------------------------------------
-// returns: number of bytes sent, or -1 on error.
+// returns:
+//  ( >= 0 )    count of bytes send.
+//  ( < 0 )     error.
 int mnet_sendv(
             mnet_socket_t sock,
             const mnet_iovec_t* iov,
@@ -453,7 +461,10 @@ int mnet_sendv(
 // iovcnt: number of buffers in array.
 // flags: flags to receive with.
 // ----------------------------------------------------------------
-// returns: number of bytes received, 0 if connection closed, -1 on error.
+// returns:
+//  ( > 0 )     count of bytes send.
+//  ( == 0 )    gracefull disconnect.
+//  ( < 0 )     error.
 int mnet_recvv(
             mnet_socket_t sock,
             mnet_iovec_t* iov,
@@ -910,7 +921,7 @@ mnet_result_t mnet_socket_is_valid(mnet_socket_t sock)
 //
 
 
-int mnet_bind(mnet_socket_t sock, const mnet_sockaddr_t* addr, mnet_socklen_t addrlen)
+mnet_result_t mnet_bind(mnet_socket_t sock, const mnet_sockaddr_t* addr, mnet_socklen_t addrlen)
 {
     return bind(sock, addr, addrlen);
 }
